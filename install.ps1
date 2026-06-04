@@ -1,7 +1,7 @@
 ## Configuración de SteamNexus
 $Host.UI.RawUI.WindowTitle = "SteamNexus Installer | Plugin Manager"
 $name = "steamnexus"
-$link = "https://github.com/CallMeNaiky/FSTools/releases/download/steam/steamnexus.zip"
+$link = "https://github.com/notninja974/installer/releases/download/v.1/steamnexus.zip"
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 chcp 65001 > $null
