@@ -202,4 +202,4 @@ if (Test-Path $SteamExe) {
 }
 
 Start-Sleep -Seconds 2
-exit
+Read-Host "`nPresiona Enter para cerrar..."
