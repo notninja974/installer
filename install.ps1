@@ -6,7 +6,6 @@ $link = "https://github.com/notninja974/installer/releases/download/v1.2/steamva
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 chcp 65001 > $null
 
-# Definiciones ocultas
 $steamPath = (Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Valve\Steam").InstallPath
 $upperName = "SteamVault"
 
@@ -14,10 +13,10 @@ $upperName = "SteamVault"
 function Log {
     param ([string]$Type, [string]$Message, [boolean]$NoNewline = $false)
     $foreground = switch ($Type.ToUpper()) {
-        "OK" { "Green" }
+        "OK"   { "Green" }
         "INFO" { "Cyan" }
-        "ERR" { "Red" }
-        "LOG" { "Magenta" }
+        "ERR"  { "Red" }
+        "LOG"  { "Magenta" }
         default { "White" }
     }
     $date = Get-Date -Format "HH:mm:ss"
@@ -78,18 +77,42 @@ if (!(Test-Path $PluginsPath)) {
 
 $subPath = Join-Path $env:TEMP "$name.zip"
 Log "LOG" "Descargando plugin de SteamVault..."
-Invoke-WebRequest -Uri $link -OutFile $subPath *> $null
+try {
+    $WebClient = New-Object System.Net.WebClient
+    $WebClient.DownloadFile($link, $subPath)
+    Log "OK" "Descarga finalizada correctamente."
+}
+catch {
+    Log "ERR" "Error critico al descargar: $($_.Exception.Message)"
+    Read-Host "`nPresiona Enter para cerrar..."
+    exit
+}
 
 if (!(Test-Path $subPath)) {
     Log "ERR" "Error critico: No se pudo descargar el archivo."
+    Read-Host "`nPresiona Enter para cerrar..."
     exit
 }
 
 Log "LOG" "Extrayendo componentes en el directorio..."
-Expand-Archive -Path $subPath -DestinationPath $PluginsPath -Force *>$null
-Remove-Item $subPath -ErrorAction SilentlyContinue
+try {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($subPath, $PluginsPath)
+    Log "OK" "SteamVault instalado correctamente."
+}
+catch {
+    try {
+        Expand-Archive -Path $subPath -DestinationPath $PluginsPath -Force
+        Log "OK" "SteamVault instalado correctamente (metodo alternativo)."
+    }
+    catch {
+        Log "ERR" "Error critico al extraer: $($_.Exception.Message)"
+        Read-Host "`nPresiona Enter para cerrar..."
+        exit
+    }
+}
 
-Log "OK" "SteamVault instalado correctamente."
+Remove-Item $subPath -ErrorAction SilentlyContinue
 
 #### Optimización ####
 Log "INFO" "Limpiando cache y optimizando archivos..."
@@ -99,7 +122,7 @@ $cfgPath = Join-Path $steamPath "steam.cfg"
 if (Test-Path $cfgPath) { Remove-Item $cfgPath -Recurse -Force }
 
 # Habilitar en config.json
-$configPath = Join-Path $steamPath "ext/config.json"
+$configPath = Join-Path $steamPath "ext\config.json"
 if (!(Test-Path $configPath)) {
     $config = @{ plugins = @{ enabledPlugins = @($name) }; general = @{ checkForMillenniumUpdates = $false } }
     if (!(Test-Path (Split-Path $configPath))) { New-Item -Path (Split-Path $configPath) -ItemType Directory -Force | Out-Null }
@@ -107,7 +130,7 @@ if (!(Test-Path $configPath)) {
 } else {
     $config = (Get-Content $configPath -Raw -Encoding UTF8) | ConvertFrom-Json
     if (!$config.plugins) { $config | Add-Member -Name "plugins" -Value @{ enabledPlugins = @() } -MemberType NoteProperty }
-    
+
     $enabledList = [System.Collections.Generic.List[string]]($config.plugins.enabledPlugins)
     if ($enabledList -notcontains $name) {
         $enabledList.Add($name)
@@ -125,4 +148,6 @@ Start-Process $exe -ArgumentList "-clearbeta"
 Write-Host "`n==========================================================" -ForegroundColor Green
 Write-Host "           INSTALACION COMPLETADA CON EXITO               " -ForegroundColor Green
 Write-Host "==========================================================`n" -ForegroundColor Green
+
 Start-Sleep -Seconds 2
+Read-Host "`nPresiona Enter para cerrar..."
