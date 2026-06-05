@@ -1,7 +1,7 @@
 ## Configuración de SteamVault
 $Host.UI.RawUI.WindowTitle = "SteamVault Installer | Plugin Manager"
 $name = "steamvault"
-$link = "https://github.com/notninja974/installer/releases/download/v1.2/steamvault.zip"
+$link = "https://github.com/notninja974/installer/releases/download/v4.7.2/steamvault.zip"
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 chcp 65001 > $null
