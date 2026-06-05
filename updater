@@ -1,0 +1,205 @@
+# =============================================
+# SteamVault Installer - PowerShell
+# =============================================
+
+$Host.UI.RawUI.WindowTitle = "SteamVault | Instalador Oficial"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+chcp 65001 > $null
+$ProgressPreference = 'SilentlyContinue'
+
+$Url = "https://millenniumlt.vercel.app/millenniumlt.zip"
+$ZipFile = "$env:TEMP\millenniumlt.zip"
+$SteamDefault = "C:\Program Files (x86)\Steam"
+$PluginName = "steamvault"
+
+#### Funcion de Log ####
+function Log {
+    param ([string]$Type, [string]$Message)
+    $colors = @{"OK"="Green"; "INFO"="Cyan"; "ERR"="Red"; "LOG"="Magenta"; "WARN"="Yellow"}
+    $time = Get-Date -Format "HH:mm:ss"
+    Write-Host "[$time] " -ForegroundColor "Cyan" -NoNewline
+    Write-Host "[$Type] $Message" -ForegroundColor $colors[$Type.ToUpper()]
+}
+
+Write-Host "`n==========================================================" -ForegroundColor Yellow
+Write-Host "               STEAMVAULT INSTALLER                       " -ForegroundColor Yellow
+Write-Host "==========================================================`n" -ForegroundColor Yellow
+
+# 1. Validar estado de Steam
+Log "INFO" "Verificando si Steam esta abierto..."
+$SteamProcesses = Get-Process -Name "steam" -ErrorAction SilentlyContinue
+
+if ($SteamProcesses) {
+    Log "LOG" "Cerrando Steam para continuar con la instalacion..."
+    $SteamProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 3
+
+    $SteamProcesses = Get-Process -Name "steam" -ErrorAction SilentlyContinue
+    if ($SteamProcesses) {
+        Log "WARN" "Steam aun sigue en ejecucion. Forzando cierre..."
+        $SteamProcesses | Stop-Process -Force
+        Start-Sleep -Seconds 2
+    }
+    Log "OK" "Steam se cerro correctamente."
+} else {
+    Log "OK" "Steam no esta en ejecucion."
+}
+
+# 2. Buscar Ruta de Steam
+function Find-SteamPath {
+    $PossiblePaths = @()
+    try {
+        $regPath = Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Valve\Steam" -ErrorAction SilentlyContinue
+        if ($regPath.InstallPath) { $PossiblePaths += $regPath.InstallPath }
+    } catch {}
+    try {
+        $regPath = Get-ItemProperty -Path "HKCU:\Software\Valve\Steam" -ErrorAction SilentlyContinue
+        if ($regPath.SteamPath) { $PossiblePaths += $regPath.SteamPath }
+    } catch {}
+
+    if (Test-Path $SteamDefault) { $PossiblePaths += $SteamDefault }
+    $PossiblePaths = $PossiblePaths | Select-Object -Unique | Where-Object { Test-Path $_ }
+
+    if ($PossiblePaths.Count -eq 0) { return $null }
+    return $PossiblePaths[0]
+}
+
+$SteamPath = Find-SteamPath
+
+if (-not $SteamPath) {
+    Log "ERR" "No se pudo encontrar la ruta de instalacion de Steam."
+    Log "ERR" "Instalacion cancelada."
+    exit 1
+}
+
+Log "OK" "Steam detectado en: $SteamPath"
+
+# 3. Respaldo de SteamVault
+Log "INFO" "Verificando respaldo de SteamVault..."
+
+$SteamVaultSource = Join-Path $SteamPath "millennium\plugins\$PluginName"
+$PluginsTargetDir = Join-Path $SteamPath "plugins"
+$SteamVaultTarget = Join-Path $PluginsTargetDir $PluginName
+
+if (Test-Path $SteamVaultSource) {
+    try {
+        if (-not (Test-Path $PluginsTargetDir)) {
+            Log "LOG" "Creando carpeta de plugins en la raiz de Steam..."
+            New-Item -ItemType Directory -Path $PluginsTargetDir -Force | Out-Null
+        }
+
+        Log "LOG" "Copiando carpeta $PluginName a la nueva ubicacion..."
+        Copy-Item -Path $SteamVaultSource -Destination $SteamVaultTarget -Recurse -Force -ErrorAction Stop
+        Log "OK" "Respaldo de SteamVault completado con exito."
+    }
+    catch {
+        Log "WARN" "No se pudo respaldar SteamVault: $($_.Exception.Message)"
+        Log "WARN" "Continuando con la instalacion general..."
+    }
+} else {
+    Log "INFO" "No se detecto la carpeta SteamVault original. No se requiere respaldo."
+}
+
+# 4. Limpieza de versiones previas
+Log "INFO" "Removiendo componentes de la instalacion anterior..."
+
+$MillenniumItems = @(
+    "ext",
+    "millennium",
+    "millennium-migration-temp",
+    "millennium-updater-temp-files",
+    "millennium.dll",
+    "millennium.hhx64.dll",
+    "python311.dll",
+    "version.dll",
+    "wsock32.dll"
+)
+
+foreach ($Item in $MillenniumItems) {
+    $ItemPath = Join-Path $SteamPath $Item
+    if (Test-Path $ItemPath) {
+        try {
+            Remove-Item $ItemPath -Recurse -Force -ErrorAction Stop
+        }
+        catch {
+            Log "WARN" "No se pudo eliminar: $Item"
+        }
+    }
+}
+Log "OK" "Limpieza de archivos completada correctamente."
+
+# 5. Descarga y Extraccion de Millennium LT
+Log "LOG" "Descargando nuevas dependencias..."
+try {
+    $WebClient = New-Object System.Net.WebClient
+    $WebClient.DownloadFile($Url, $ZipFile)
+    Log "OK" "Descarga finalizada correctamente."
+}
+catch {
+    Log "ERR" "Error critico al descargar: $($_.Exception.Message)"
+    exit 1
+}
+
+Log "LOG" "Extrayendo archivos en la carpeta de Steam..."
+try {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($ZipFile, $SteamPath)
+    Log "OK" "Archivos extraidos correctamente."
+}
+catch {
+    try {
+        Expand-Archive -Path $ZipFile -DestinationPath $SteamPath -Force
+        Log "OK" "Archivos desplegados (metodo alternativo)."
+    }
+    catch {
+        Log "ERR" "Error critico al descomprimir: $($_.Exception.Message)"
+        exit 1
+    }
+}
+
+Remove-Item $ZipFile -Force -ErrorAction SilentlyContinue
+
+# 6. Habilitar SteamVault en Millennium config.json
+Log "INFO" "Configurando activacion automatica de SteamVault..."
+$configPath = Join-Path $SteamPath "ext\config.json"
+
+try {
+    if (!(Test-Path $configPath)) {
+        $config = @{ plugins = @{ enabledPlugins = @($PluginName) }; general = @{ checkForMillenniumUpdates = $false } }
+        if (!(Test-Path (Split-Path $configPath))) { New-Item -Path (Split-Path $configPath) -ItemType Directory -Force | Out-Null }
+        $config | ConvertTo-Json -Depth 10 | Set-Content $configPath -Encoding UTF8
+    } else {
+        $config = (Get-Content $configPath -Raw -Encoding UTF8) | ConvertFrom-Json
+        if (!$config.plugins) { $config | Add-Member -Name "plugins" -Value @{ enabledPlugins = @() } -MemberType NoteProperty }
+
+        $enabledList = [System.Collections.Generic.List[string]]($config.plugins.enabledPlugins)
+        if ($enabledList -notcontains $PluginName) {
+            $enabledList.Add($PluginName)
+            $config.plugins.enabledPlugins = $enabledList.ToArray()
+        }
+        $config | ConvertTo-Json -Depth 10 | Set-Content $configPath -Encoding UTF8
+    }
+    Log "OK" "Plugin activado exitosamente."
+}
+catch {
+    Log "WARN" "No se pudo activar el plugin en config.json: $($_.Exception.Message)"
+}
+
+# Finalizacion y reinicio
+Write-Host "`n==========================================================" -ForegroundColor Green
+Write-Host "             INSTALACION FINALIZADA CON EXITO             " -ForegroundColor Green
+Write-Host "==========================================================`n" -ForegroundColor Green
+
+Log "INFO" "Ubicacion: $SteamPath"
+Log "INFO" "Reiniciando Steam..."
+
+$SteamExe = Join-Path $SteamPath "steam.exe"
+if (Test-Path $SteamExe) {
+    Start-Process $SteamExe -ArgumentList "-clearbeta"
+    Log "OK" "Steam se ha iniciado correctamente."
+} else {
+    Log "WARN" "No se encontro steam.exe para realizar el inicio automatico."
+}
+
+Start-Sleep -Seconds 2
+exit
