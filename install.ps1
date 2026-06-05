@@ -1,14 +1,14 @@
-## Configuración de SteamNexus
-$Host.UI.RawUI.WindowTitle = "SteamNexus Installer | Plugin Manager"
-$name = "steamnexus"
-$link = "https://github.com/notninja974/installer/releases/download/v.1/steamnexus.zip"
+## Configuración de SteamVault
+$Host.UI.RawUI.WindowTitle = "SteamVault Installer | Plugin Manager"
+$name = "steamvault"
+$link = "https://github.com/notninja974/installer/releases/download/v1.2/steamvault.zip"
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 chcp 65001 > $null
 
 # Definiciones ocultas
 $steamPath = (Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Valve\Steam").InstallPath
-$upperName = "SteamNexus"
+$upperName = "SteamVault"
 
 #### Función de Log ####
 function Log {
@@ -29,7 +29,7 @@ function Log {
 $ProgressPreference = 'SilentlyContinue'
 
 Write-Host "`n==========================================================" -ForegroundColor Yellow
-Write-Host "                STEAM NEXUS INSTALLER                     " -ForegroundColor Yellow
+Write-Host "                STEAM VAULT INSTALLER                      " -ForegroundColor Yellow
 Write-Host "==========================================================`n" -ForegroundColor Yellow
 
 # Cerrar Steam para comenzar
@@ -70,14 +70,14 @@ if ($needsMillennium) {
 
 Log "OK" "Dependencias listas."
 
-#### Instalación del Plugin SteamNexus ####
+#### Instalación del Plugin SteamVault ####
 $PluginsPath = Join-Path $steamPath "plugins"
 if (!(Test-Path $PluginsPath)) {
     New-Item -Path $PluginsPath -ItemType Directory *> $null
 }
 
 $subPath = Join-Path $env:TEMP "$name.zip"
-Log "LOG" "Descargando plugin de SteamNexus..."
+Log "LOG" "Descargando plugin de SteamVault..."
 Invoke-WebRequest -Uri $link -OutFile $subPath *> $null
 
 if (!(Test-Path $subPath)) {
@@ -89,7 +89,7 @@ Log "LOG" "Extrayendo componentes en el directorio..."
 Expand-Archive -Path $subPath -DestinationPath $PluginsPath -Force *>$null
 Remove-Item $subPath -ErrorAction SilentlyContinue
 
-Log "OK" "SteamNexus instalado correctamente."
+Log "OK" "SteamVault instalado correctamente."
 
 #### Optimización ####
 Log "INFO" "Limpiando cache y optimizando archivos..."
@@ -107,7 +107,7 @@ if (!(Test-Path $configPath)) {
 } else {
     $config = (Get-Content $configPath -Raw -Encoding UTF8) | ConvertFrom-Json
     if (!$config.plugins) { $config | Add-Member -Name "plugins" -Value @{ enabledPlugins = @() } -MemberType NoteProperty }
-
+    
     $enabledList = [System.Collections.Generic.List[string]]($config.plugins.enabledPlugins)
     if ($enabledList -notcontains $name) {
         $enabledList.Add($name)
