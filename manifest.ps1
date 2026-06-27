@@ -292,9 +292,9 @@ if ($env:MANIFEST_MODE) {
     Write-Host ""
     Write-Host "  Select download mode:" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "    1. Github Mirror    (No Key Required, Try This First!)" -ForegroundColor White
-    Write-Host "    2. Morrenus         (Free Key from https://hubcapmanifest.com/)" -ForegroundColor White
-    Write-Host "    3. ManifestHub      (Free Key from https://manifesthub1.filegear-sg.me/)" -ForegroundColor White
+    Write-Host "    1. Github Mirror" -ForegroundColor White
+    Write-Host "    2. Morrenus" -ForegroundColor White
+    Write-Host "    3. ManifestHub" -ForegroundColor White
     Write-Host ""
     do {
         $modeChoice = Read-Host "  Enter choice (1-3)"
